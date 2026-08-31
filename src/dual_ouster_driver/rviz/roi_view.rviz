@@ -1,0 +1,77 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Name: Grid
+      Reference Frame: map
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+      Show Names: true
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: RawLidar1
+      Alpha: 0.25
+      Topic:
+        Value: /lidar1/points
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+      Style: Points
+      Size (Pixels): 2
+      Color Transformer: AxisColor
+      Axis: Z
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: ROIPoints
+      Topic:
+        Value: /lidar1/roi_points
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+      Style: Points
+      Size (Pixels): 3
+      Color Transformer: FlatColor
+      Color: 255; 60; 60
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: ClusterMedian
+      Namespaces:
+        {}
+      Topic:
+        Value: /lidar1/cluster_markers
+        Depth: 10
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+  Global Options:
+    Fixed Frame: map
+    Background Color: 48; 48; 48
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Interact
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 20
+      Focal Point:
+        X: 5
+        Y: 5
+        Z: 1
+      Yaw: 0.785
+      Pitch: 0.6
+Window Geometry:
+  Height: 900
+  Width: 1400

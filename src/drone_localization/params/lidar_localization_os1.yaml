@@ -1,0 +1,496 @@
+lidar_drone_tracker:
+  ros__parameters:
+
+    # ===============================================================
+    # COMPETITION FIELD AND COORDINATE SYSTEM
+    # ===============================================================
+    #
+    # World frame:
+    #
+    #   Origin: (0, 0, 0)
+    #   X-axis: field length
+    #   Y-axis: field width
+    #   Z-axis: upward
+    #
+    # Competition field:
+    #
+    #   X = 0 ... 24 m
+    #   Y = 0 ... 15 m
+    #
+    # LiDAR arrangement:
+    #
+    #                 +Y
+    #
+    #              LiDAR 2
+    #           (12, 16, 0.84)
+    #                 |
+    #                 |
+    #       -------------------------
+    #       |                       |
+    #       |      24 m x 15 m      |
+    #       |                       |
+    #       |                       |
+    #       -------------------------
+    #                 |
+    #                 |
+    #              LiDAR 1
+    #           (12, -1, 0.84)
+    #
+    # LiDAR 1 and LiDAR 2 face approximately toward each other
+    # along the Y-axis.
+    #
+    # Transformation performed by lidar_drone_tracker:
+    #
+    #   p_world = R_lidar_to_world * p_lidar + t_lidar_to_world
+    #
+    # Each LiDAR is processed independently:
+    #
+    #   raw cloud
+    #      -> world transformation
+    #      -> ROI
+    #      -> voxel/SOR filtering
+    #      -> DBSCAN
+    #      -> individual drone position
+    #
+    # Only the resulting drone positions are fused.
+    #
+    # Point clouds from LiDAR 1 and LiDAR 2 are NOT fused.
+    # ===============================================================
+
+
+    # ===============================================================
+    # LiDAR 1
+    # ===============================================================
+    #
+    # SINGLE-SENSOR BENCH TEST.
+    #
+    # The one connected sensor (192.168.6.11, sn 122531002331) publishes on
+    # /lidar1/points but is standing at the LiDAR 2 spot, hence y = 3.64.
+    #
+    # yaw is +90 deg, NOT the -90 deg that LiDAR 2 below carries: the sensor
+    # is turned 180 deg from the heading that spot is meant to have, facing
+    # away from field centre rather than toward it. Measured, not assumed --
+    # with yaw = -90 deg at this position the ROI lands on a wall 0.75 m in
+    # front of the sensor and takes in 43523 points; at +90 deg it looks down
+    # the open side of the room and takes in 0. Either physically rotate the
+    # sensor 180 deg and set -90 here, or leave both as they are.
+    #
+    # Provisional: hand-entered, not from extrinsic_calibrator. All six
+    # values must be replaced by a Kabsch solve before any scoring run.
+    # ===============================================================
+
+    lidar1_topic: "/lidar1/points"
+
+    lidar1_x:     2.0
+    lidar1_y:     3.64
+    lidar1_z:      1.0
+
+    lidar1_roll:   0.0
+    lidar1_pitch:  0.0
+    lidar1_yaw:    1.57079632679
+
+
+    # ===============================================================
+    # LiDAR 2
+    # ===============================================================
+    #
+    # The two sensors are in each other's designed spots. 192.168.6.12
+    # (sn 122451001190) publishes on /lidar2/points and stands at the LiDAR 1
+    # spot, hence y = 0.36 -- the mirror of what lidar1 above is doing.
+    #
+    # yaw and z are NOT measured yet. -90 deg is the heading this spot was
+    # designed for, kept as a placeholder; lidar1 turned out to be 180 deg off
+    # from its own designed heading, so do not assume this one is right. Until
+    # it is checked, the two clouds will not overlap and fusing them makes the
+    # estimate worse than either sensor alone -- especially with the
+    # association gate disabled below, which would otherwise have rejected the
+    # disagreeing measurement.
+    #
+    # To check: bring both drivers up and compare where each sensor places the
+    # same physical object in world frame. They should land on top of each
+    # other.
+    # ===============================================================
+
+    lidar2_topic: "/lidar2/points"
+
+    lidar2_x:     2.0
+    lidar2_y:     -1.36
+    lidar2_z:     1.0
+
+    lidar2_roll:   0.0
+    lidar2_pitch:  0.0
+    lidar2_yaw:   -1.57079632679
+
+
+    # ===============================================================
+    # SENSOR TIMING
+    # ===============================================================
+
+    # Maximum age of an individual LiDAR cloud.
+    #
+    # At 10 Hz:
+    # frame period = 0.1 s
+    #
+    # 0.25 s therefore tolerates approximately two missed frames.
+
+    buffer_stale_timeout: 0.25
+
+    # ---------------------------------------------------------------
+    # 두 스캔의 시각 차이를 어디까지 허용하는가
+    # ---------------------------------------------------------------
+    #
+    # PTP phase lock 없이 OS1 두 대를 돌리면 스캔 시각이 최대 반 주기
+    # (10 Hz에서 50 ms)까지 벌어진다. 이건 관측 오차가 아니라 실제로 드론이
+    # 다른 자리에 있었던 것이므로, 트래커는 참는 대신 **보정한다** — 늦은
+    # 쪽 검출을 필터 속도로 최신 스캔 시각까지 끌어온 뒤 두 개를 다 쓴다.
+    #
+    #   async_tolerance_sec  극좌표 EKF가 두 센서를 다 쓰는 한계.
+    #                        이걸 넘으면 한쪽이 밀린 것(프레임 유실·센서
+    #                        정지)으로 보고 최신 것만 쓴다.
+    #   sync_tolerance_sec   use_polar_ekf: false 인 융합 경로 전용.
+    #                        그쪽은 두 위치를 평균하므로 진짜로 동시여야 한다.
+    #
+    # 판정: 트래커가 5초마다 실측 차이를 찍는다.
+    #   "PTP/scan timestamp delta: median=... p95=..."
+    # p95가 async_tolerance_sec 보다 크면 이 값을 올리거나 PTP를 켤 것.
+    # 진단 CSV(ekf_diagnostics.csv)의 sync_dt_ms 열에도 프레임마다 남는다.
+    # ---------------------------------------------------------------
+
+    async_tolerance_sec: 0.06
+    sync_tolerance_sec: 0.010
+
+    lidar_update_rate: 10.0
+
+
+    # ===============================================================
+    # VOXEL DOWNSAMPLING
+    # ===============================================================
+    #
+    # 5 cm voxel size.
+    #
+    # OS1-128 generates a dense point cloud. Downsampling reduces
+    # computation while retaining adequate geometric information
+    # for the drone cluster.
+    #
+    # Do NOT set this to 0. Measured on this setup with 4566 ROI points,
+    # SOR + DBSCAN cost 136 ms/frame with no downsampling versus 9 ms at
+    # 0.05 -- and 136 ms overruns the 100 ms budget at 10 Hz, after which
+    # every arriving frame ages past buffer_stale_timeout and gets dropped,
+    # so the tracker publishes nothing at all.
+    # ===============================================================
+
+    voxel_leaf_size: 0.05
+
+
+    # ===============================================================
+    # WORLD-FRAME ROI
+    # ===============================================================
+    #
+    # Actual competition field:
+    #
+    #   0 <= X <= 24 m
+    #   0 <= Y <= 15 m
+    #
+    # INDOOR BENCH TEST: sized to the largest box this room leaves empty,
+    # measured over 5 accumulated frames (439678 points, z 0.5-2.5) with the
+    # lidar1 pose above. Walls sit just outside every face:
+    #
+    #   x -0.5 .. 4.5  -> 22044 pts (side wall)      x 0.0 .. 4.0  -> 0
+    #   y -1.5 .. 3.5  ->   784 pts (far wall)       y -1.0 .. 3.5 -> 0
+    #   y -0.5 .. 4.0  -> 16699 pts (wall behind)    y -0.5 .. 3.6 -> 0
+    #
+    # Values below back off ~0.2 m from those edges. Going wider re-admits
+    # wall clusters, which cold start would lock onto since it takes the
+    # best cluster ungated (seed_at_home is off).
+    #
+    # The previous y_min of 0.5 was what ended the last run: the tracked
+    # body crossed it at y=0.544 -> 0.411 and the filter coasted from there,
+    # velocity frozen at (0.063, -0.446, 0.345) and covariance climbing to
+    # 39 m^2. y_min -0.8 buys 1.3 m more travel before that happens.
+    # ===============================================================
+
+    roi_x_min: 0.0
+    roi_x_max: 4.0
+
+    roi_y_min: -0.8
+    roi_y_max: 3.6
+
+    roi_z_min: 0.5
+    roi_z_max: 2.5
+
+
+    # ===============================================================
+    # STATISTICAL OUTLIER REMOVAL
+    # ===============================================================
+    #
+    # Applied INDEPENDENTLY to:
+    #
+    #   /lidar1/points_world
+    #   /lidar2/points_world
+    #
+    # before DBSCAN.
+    # ===============================================================
+
+    sor_mean_k: 20
+    sor_std_ratio: 2.0
+
+
+    # ===============================================================
+    # DBSCAN CLUSTERING
+    # ===============================================================
+    #
+    # IMPORTANT:
+    #
+    # DBSCAN is now performed separately for LiDAR 1 and LiDAR 2.
+    #
+    # LiDAR 1:
+    #   filtered cloud -> DBSCAN -> drone position p1
+    #
+    # LiDAR 2:
+    #   filtered cloud -> DBSCAN -> drone position p2
+    #
+    # p1 and p2 are subsequently fused.
+    #
+    # The point clouds themselves are never concatenated.
+    # ===============================================================
+
+    cluster_tolerance: 0.40
+
+    cluster_min_points: 2
+
+    # Largest bounding-box side a cluster may have. This -- not
+    # cluster_max_points -- is what actually separates the target from a wall.
+    #
+    # Raised from the 1.20 m code default to 2.00 m so a PERSON can be used as
+    # a stand-in target. A person's measured extent grows with range, opposite
+    # to intuition: OS1's +/-21.2 deg vertical FOV covers 1.14 m of height at
+    # 1.47 m but 3.22 m at 4.15 m, so more of the body enters the cloud the
+    # further away they stand. Measured on this setup: standing 1.47 m out the
+    # person clustered at extent 1.07 m and tracked fine; standing near the
+    # world origin, 4.15 m out, the same person came to 1.40 m and was
+    # silently dropped by the 1.20 m default.
+    #
+    # 2.00 m is still far below the wall clusters here (5.56 m measured), so
+    # nothing structural gets in. Put this back to ~0.80 m once the actual
+    # drone replaces the person -- a 0.5 m airframe never needs 2 m, and the
+    # tighter bound is what protects cold start.
+
+    cluster_max_extent: 2.00
+
+    # Effectively disabled as a discriminator, kept only as a guard against
+    # a runaway cluster. Point count scales with 1/range^2 while a body's
+    # extent does not, so a fixed cap rejects the drone up close and lets
+    # walls through once voxel downsampling thins them: measured on this
+    # setup, two wall clusters came out at 403 and 737 points (both under
+    # 1000) and only cluster_max_extent rejected them. Size filtering is
+    # cluster_max_extent's job.
+
+    cluster_max_points: 100000
+
+
+    # ===============================================================
+    # INITIAL TRACK / HOME
+    # ===============================================================
+    #
+    # Competition home position:
+    #
+    #   X = 0
+    #   Y = 0
+    #
+    # Nominal tracking altitude:
+    #
+    #   Z = 2 m
+    # ===============================================================
+
+    # OFF for the indoor bench test. home (0,0,2) sits OUTSIDE the ROI below,
+    # so seeding there put the KF somewhere the drone can never be, and the
+    # association gate -- min(max_assoc_dist + 3*sigma, cap) = 3.5 m from the
+    # seed -- then rejected everything in the far half of the ROI: the corner
+    # (3.5,3.5) is 4.97 m from home. With this off, predicted is None until
+    # the first detection, so cold start takes the best cluster ungated and
+    # the gate only applies once the track actually exists.
+    #
+    # Re-enable for the competition field, where home is inside the ROI.
+
+    seed_at_home: false
+
+    home_x: 0.0
+    home_y: 0.0
+    home_z: 2.0
+
+
+    # ===============================================================
+    # ASSOCIATION GATE
+    # ===============================================================
+    #
+    # Each LiDAR independently selects a DBSCAN cluster close to
+    # the current fused Kalman prediction:
+    #
+    #   gate = min(max_assoc_dist + gate_sigma_k * sigma, max_assoc_dist_cap)
+    #
+    # TURNED OFF for the indoor bench test -- both values are far larger than
+    # the room, so nothing is ever rejected and the nearest candidate to the
+    # prediction always wins.
+    #
+    # Why: once the track coasted, predict() kept running with the velocity
+    # frozen, so the prediction ran away while the cap held the gate at 4.0 m.
+    # A person standing at (2.08, 2.17, 1.07) cleared every cluster filter --
+    # 382 points, extent 1.07 m -- and was still refused, because the runaway
+    # prediction sat more than 4 m away. The gate could never widen enough to
+    # recover, and reset_after_frames did not save it either: _process returns
+    # early when no fresh frame pair is available, so the coast counter stops
+    # advancing exactly when the tracker is starved.
+    #
+    # Safe here only because the ROI is measured empty -- the drone or person
+    # is the sole candidate. Restore real values (2.0 / 4.0) for the
+    # competition field, where clutter makes the gate the thing that keeps
+    # the filter from jumping to an unrelated object.
+    # ===============================================================
+
+    max_assoc_dist: 1000.0
+    max_assoc_dist_cap: 1000.0
+
+
+    # ===============================================================
+    # KALMAN FILTER
+    # ===============================================================
+    #
+    # One 6-state constant-velocity filter, two ways to feed it.
+    #
+    #   use_polar_ekf: true   (default)
+    #
+    #     LiDAR 1 position --> EKF update in LiDAR 1 polar frame -\
+    #                                                              -> one filter
+    #     LiDAR 2 position --> EKF update in LiDAR 2 polar frame -/
+    #
+    #   use_polar_ekf: false  (previous behaviour)
+    #
+    #     LiDAR 1 position ----\
+    #                           -> covariance fusion -> linear KF update
+    #     LiDAR 2 position ----/
+    #
+    # Final output:
+    #
+    #   /drone/estimated_pose
+    # ===============================================================
+
+    proc_noise_pos: 0.05
+    proc_noise_vel: 0.30
+
+    # Isotropic measurement sigma. Used by the fused/linear path, and as the
+    # filter's default R. The polar path replaces it with the per-sensor
+    # ekf_* values below.
+    meas_noise_pos: 0.15
+
+
+    # ===============================================================
+    # PER-SENSOR POLAR EKF
+    # ===============================================================
+    #
+    # Why polar: LiDAR error is not isotropic in world XYZ. Along the line of
+    # sight the dominant term is not range precision (~1 cm on an OS1) but the
+    # fact that the sensor only hits the face of the airframe pointing at it,
+    # so the cluster centroid sits roughly half an airframe in front of the
+    # true centre. That is systematic -- more points do not reduce it.
+    # Across the line of sight the error is beam spacing x distance, and that
+    # one does average down with point count.
+    #
+    # Declaring those separately in each sensor's polar frame gives each LiDAR
+    # an error ellipsoid stretched along its own view direction. In the ns
+    # layout the two views are widely separated, so one sensor's weak axis is
+    # the other's strong axis, and the near-face bias cancels geometrically --
+    # no bias state to estimate.
+    #
+    # Tuning check: the tracker logs mean NIS every 2 s and writes
+    # ekf_diagnostics.csv into the run folder. NIS is chi-square with 3 dof,
+    # so the mean should sit near 3.0. Much higher = sigmas too small (the
+    # filter is overconfident); much lower = too conservative. After a flight:
+    #
+    #   ros2 run drone_localization check_ekf_fusion --output_dir <run folder>
+    # ===============================================================
+
+    use_polar_ekf: true
+
+    # Line-of-sight sigma [m]. Half the expected airframe depth, roughly.
+    # Systematic, so it is NOT divided by sqrt(point count).
+    ekf_sigma_range: 0.10
+
+    # OS1-128 angular sampling [deg]: 1024x10 Hz gives 0.35 deg horizontally,
+    # and 45 deg / 128 channels = 0.35 deg vertically. Update if the mode
+    # changes (512x10 -> 0.70, 2048x10 -> 0.18).
+    ekf_beam_res_deg: 0.35
+
+    # Expected airframe scale [m]: how far off centre a hit on the near face
+    # can land. Sets the close-range floor on the cross-range sigma -- without
+    # it, nearby detections look far more precise than they are. Unknown per
+    # team, so this is an expected-scale parameter like ekf_sigma_range.
+    ekf_sigma_body: 0.14
+    #
+    # Note: each sensor's lidarN_extrinsic_rmse is added on top of both terms
+    # automatically. Calibration error does not shrink with point count either.
+
+
+    # ===============================================================
+    # TRACK COASTING
+    # ===============================================================
+    #
+    # If neither LiDAR provides a valid measurement, the Kalman
+    # filter temporarily predicts the position.
+    #
+    # 15 frames at 10 Hz = approximately 1.5 s.
+    # ===============================================================
+
+    coast_max_frames: 15
+
+    # Completely reset after 50 missed frames (~5 s).
+
+    reset_after_frames: 50
+
+
+    # ===============================================================
+    # WAYPOINT / MARKER HOVER DETECTION
+    # ===============================================================
+
+    waypoint_gate_radius: 4.5
+
+    waypoint_speed_threshold: 0.25
+
+    waypoint_min_frames: 4
+
+    waypoint_grace_frames: 5
+
+
+    # ===============================================================
+    # MARKER LOCATIONS
+    # ===============================================================
+    #
+    # IMPORTANT:
+    #
+    # These coordinates MUST correspond to the actual marker
+    # locations in the new 24 m x 15 m competition field.
+    #
+    # The old coordinates:
+    #
+    #   M1 = (5, 5)
+    #   M2 = (5, 15)
+    #   M3 = (25, 5)
+    #   M4 = (15, 15)
+    #
+    # cannot be retained because x=25 lies outside the 24 m field
+    # and y=15 is directly on the northern boundary.
+    #
+    # The following values are initial valid example locations.
+    # Replace them with your actual measured competition markers.
+    # ===============================================================
+
+    marker1_x: 1.0
+    marker1_y: 1.0
+
+    marker2_x: 1.0
+    marker2_y: 3.0
+
+    marker3_x: 3.0
+    marker3_y: 2.0
+
+    marker4_x: 2.0
+    marker4_y: 2.0

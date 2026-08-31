@@ -1,0 +1,62 @@
+ouster/os_driver:
+  ros__parameters:
+
+    sensor_hostname: '192.168.6.11'
+
+    # Let the driver select/configure UDP destination
+    udp_dest: '192.168.6.100'
+
+    # Recommended initial mode
+    lidar_mode: '1024x10'
+
+    # For calibration before PTP is configured:
+    timestamp_mode: 'TIME_FROM_ROS_TIME'
+
+    # For final dual-LiDAR tracking with PTP:
+    # timestamp_mode: 'TIME_FROM_PTP_1588'
+
+    ptp_utc_tai_offset: -37.0
+
+    # Compatible with FW 3.0/3.1
+    udp_profile_lidar: 'RNG19_RFL8_SIG16_NIR16'
+
+    # 0 lets driver select available UDP ports
+    lidar_port: 0
+    imu_port: 0
+
+    sensor_frame: 'lidar1_sensor'
+    lidar_frame: 'lidar1'
+    imu_frame: 'lidar1_imu'
+
+    point_cloud_frame: 'lidar1'
+
+    pub_static_tf: true
+
+    # We only really need point cloud for your tracker.
+    # IMU may still be useful for diagnostics.
+    proc_mask: 'PCL|IMU'
+
+    use_system_default_qos: false
+
+    # Your existing Python tracker only reads x,y,z
+    point_type: 'xyz'
+
+    azimuth_window_start: 0
+    azimuth_window_end: 360000
+
+    operating_mode: 'NORMAL'
+
+    signal_multiplier: 1.0
+
+    # Initially false until PTP verified.
+    phase_lock_enable: false
+    phase_lock_offset: 0
+
+    persist_config: false
+
+    attempt_reconnect: true
+
+    dormant_period_between_reconnects: 1.0
+
+    organized: true
+    destagger: true

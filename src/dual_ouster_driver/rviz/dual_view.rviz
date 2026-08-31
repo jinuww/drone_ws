@@ -1,0 +1,121 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded: ~
+      Splitter Ratio: 0.5
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 20
+      Color: 160; 160; 164
+      Alpha: 0.5
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Marker Scale: 0.6
+    # ROI 통과한 점. 두 라이다를 다른 색으로 칠해서 겹치는지 눈으로 본다.
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ROI_lidar1
+      Enabled: true
+      Topic:
+        Value: /lidar1/roi_points
+        Depth: 1
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+      Style: Points
+      Size (Pixels): 9
+      Color Transformer: FlatColor
+      Color: 255; 60; 60
+      Alpha: 1
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ROI_lidar2
+      Enabled: true
+      Topic:
+        Value: /lidar2/roi_points
+        Depth: 1
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+      Style: Points
+      Size (Pixels): 9
+      Color Transformer: FlatColor
+      Color: 60; 160; 255
+      Alpha: 1
+    # 원본 점군. map -> lidarN TF 가 있어야 보인다. 기본은 꺼둔다.
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Raw_lidar1
+      Enabled: false
+      Topic:
+        Value: /lidar1/points
+        Depth: 1
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+      Style: Points
+      Size (Pixels): 1
+      Color Transformer: FlatColor
+      Color: 120; 40; 40
+      Alpha: 0.4
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Raw_lidar2
+      Enabled: false
+      Topic:
+        Value: /lidar2/points
+        Depth: 1
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+      Style: Points
+      Size (Pixels): 1
+      Color Transformer: FlatColor
+      Color: 40; 80; 120
+      Alpha: 0.4
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Cluster_lidar1
+      Enabled: true
+      Topic:
+        Value: /lidar1/cluster_markers
+        Depth: 10
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Cluster_lidar2
+      Enabled: true
+      Topic:
+        Value: /lidar2/cluster_markers
+        Depth: 10
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+  Global Options:
+    Fixed Frame: map
+    Background Color: 48; 48; 48
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Measure
+    - Class: rviz_default_plugins/PublishPoint
+      Topic:
+        Value: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 12
+      Focal Point:
+        X: 0
+        Y: 1
+        Z: 0.5
+      Pitch: 0.9
+      Yaw: 1.6
+      Target Frame: map
+Window Geometry:
+  Height: 900
+  Width: 1400
+  Displays:
+    collapsed: false

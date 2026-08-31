@@ -1,0 +1,108 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Name: Grid
+      Plane Cell Count: 24
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: EKF_trail
+      Alpha: 1
+      Topic:
+        Value: /drone/estimate_cloud
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+      Style: Points
+      Size (Pixels): 4
+      Color Transformer: Intensity
+      Channel Name: intensity
+      Autocompute Intensity Bounds: true
+      Use rainbow: true
+      Invert Rainbow: false
+      Decay Time: 0
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: EKF_position
+      Namespaces:
+        {}
+      Topic:
+        Value: /drone/estimate_markers
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+    - Class: rviz_default_plugins/PoseWithCovariance
+      Enabled: false
+      Name: EKF_pose_raw
+      Topic:
+        Value: /drone/estimated_pose
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+      Shape: Arrow
+      Covariance:
+        Value: true
+        Position:
+          Alpha: 0.3
+          Color: 204; 51; 204
+          Scale: 1
+        Orientation:
+          Value: false
+      Color: 255; 25; 0
+      Alpha: 1
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Waypoint_estimates
+      Namespaces:
+        {}
+      Topic:
+        Value: /drone/waypoint_estimates
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+    - Class: rviz_default_plugins/TF
+      Enabled: false
+      Name: TF
+      Show Names: true
+  Global Options:
+    Background Color: 34; 34; 40
+    Fixed Frame: world
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 18
+      Focal Point:
+        X: 2
+        Y: 1
+        Z: 1
+      Pitch: 0.8
+      Yaw: 1.6
+      Target Frame: <Fixed Frame>
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 800
+  Width: 1200
